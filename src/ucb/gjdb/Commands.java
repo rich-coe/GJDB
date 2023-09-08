@@ -16,6 +16,9 @@ import java.util.*;
 import java.io.*;
 import java.util.regex.*;
 
+import org.gnu.readline.Readline;
+import org.gnu.readline.ReadlineLibrary;
+
 import static ucb.gjdb.CommandException.ERROR;
 
 class Commands implements EventNotifier {
@@ -72,10 +75,9 @@ class Commands implements EventNotifier {
         } catch (InterruptedException e) { }
     }
 
-    String inputLine () {
+    String inputLine (String prompt) {
         try {
-            System.out.flush ();
-            return input.readLine ();
+            return Readline.readline(prompt);
         } catch (IOException e) { 
             return null;
         }
@@ -93,21 +95,17 @@ class Commands implements EventNotifier {
             return s;
     }
 
-    boolean yorn (String prompt, String additionalYes, 
-                  String additionalNo) {
+    boolean yorn (String prompt, String additionalYes, String additionalNo) {
         String resp;
 
         while (true) {
-            Env.notice (prompt + " [yn]: ");
-            resp = inputLine ();
+            resp = inputLine (prompt + " [yn]: ");
             if (resp == null)
                 return false;
             resp = resp.toLowerCase ();
-            if (resp.equals ("y") || resp.equals ("yes")
-                || additionalYes.indexOf (resp) >= 0)
+            if (resp.equals ("y") || resp.equals ("yes") || additionalYes.indexOf (resp) >= 0)
                 return true;
-            if (resp.equals ("n") || resp.equals ("no")
-                || additionalNo.indexOf (resp) >= 0)
+            if (resp.equals ("n") || resp.equals ("no") || additionalNo.indexOf (resp) >= 0)
                 return false;
             Env.errorln ("Please respond 'yes' or 'no'.");
         }
@@ -671,7 +669,6 @@ class Commands implements EventNotifier {
                     // the cached stack may now be stale, so invalidate it.
                     ThreadInfo.invalidateAll();
                     ThreadInfo.setCurrentThread(invokingThread);
-                    Env.printPrompt();
                 }
             };
         thread.start();
@@ -887,18 +884,16 @@ class Commands implements EventNotifier {
 
     /** Ask user to select 0 or more from the list of ITEMS. */
     List<EventRequestSpec> getUserSelections (List<EventRequestSpec> items) {
-        List<EventRequestSpec> result = 
-            new ArrayList<EventRequestSpec> (items.size ());
+        List<EventRequestSpec> result = new ArrayList<EventRequestSpec> (items.size ());
         if (items.size () == 1) {
             if (yorn ("Delete?", "aA", "0"))
                 result.add (items.get (0));
         } else if (items.size () > 0) {
             Env.noticeln ("[A] All");
             Env.noticeln ("[0] Cancel");
-            Env.notice ("Delete which? ");
             Env.flush ();
 
-            for (String item : trim (inputLine ()).split ("[\\s,]+")) {
+            for (String item : trim (inputLine ("Delete which? ")).split ("[\\s,]+")) {
                 if (item.equals ("a"))
                     return items;
                 else if (item.equals ("0"))
@@ -985,33 +980,27 @@ class Commands implements EventNotifier {
         setCondition (spec, expr);
     }
 
-    void commandCommand (BufferedReader reader, boolean prompt) {
+    void commandCommand (boolean prompt) {
         if (lastBreakpointSet == null)
             throw ERROR ("No prior breakpoint.");
-        commandCommand (lastBreakpointSet, reader, prompt);
+        commandCommand (lastBreakpointSet, prompt);
     }
 
-    void commandCommand (int id, BufferedReader reader, boolean prompt) {
+    void commandCommand (int id, boolean prompt) {
         BreakpointSpec spec = 
             (BreakpointSpec) EventRequestSpec.idToSpec 
             (Env.eventRequestSpecs (BreakpointSpec.EXMPL), id);
         if (spec == null)
             throw ERROR ("No such breakpoint: %s", id);
-        commandCommand (spec, reader, prompt);
+        commandCommand (spec, prompt);
     }
 
-    void commandCommand (BreakpointSpec spec, BufferedReader reader, 
-                         boolean prompt) {
+    void commandCommand (BreakpointSpec spec, boolean prompt) {
         try {
-            Env.noticeln ("Enter commands, terminated with a line containing "
-                          + "just 'end'.");
+            Env.noticeln ("Enter commands, terminated with a line containing just 'end'.");
             StringBuilder commands = new StringBuilder ();
             while (true) {
-                if (prompt) {
-                    Env.notice ("> ");
-                    Env.flush ();
-                }
-                String ln = reader.readLine ();
+                String ln = (null != ireader) ? ireader.readLine() : Readline.readline(prompt ? "> " : "");
                 if (ln == null)
                     break;
                 ln = trim (ln);
@@ -1470,7 +1459,6 @@ class Commands implements EventNotifier {
                                 ThreadInfo.current.setFrame (framePosn0);
                             } catch (IncompatibleThreadStateException e) { }
                     }
-                    Env.printPrompt();
                 }
             };
         thread.start();
@@ -1554,7 +1542,6 @@ class Commands implements EventNotifier {
                     // the cached stack may now be stale, so invalidate it.
                     ThreadInfo.invalidateAll();
                     ThreadInfo.setCurrentThread(invokingThread);
-                    Env.printPrompt();
                 }
             };
         thread.start();
@@ -1629,7 +1616,6 @@ class Commands implements EventNotifier {
                     // the cached stack may now be stale, so invalidate it.
                     ThreadInfo.invalidateAll();
                     ThreadInfo.setCurrentThread(invokingThread);
-                    Env.printPrompt();
                 }
             };
         thread.start();
@@ -1688,7 +1674,6 @@ class Commands implements EventNotifier {
                     // the cached stack may now be stale, so invalidate it.
                     ThreadInfo.invalidateAll();
                     ThreadInfo.setCurrentThread(invokingThread);
-                    Env.printPrompt();
                 }
             };
         thread.start();
@@ -1762,9 +1747,9 @@ class Commands implements EventNotifier {
         Env.setExcludes(L);
     }
 
-    void commandRepeat (int repeats, String cmnd, BufferedReader reader) {
+    void commandRepeat (int repeats, String cmnd) {
      	for (int i = 0; i < repeats; i += 1)
-            CommandParser.execute (cmnd, this, reader, false, true);
+            CommandParser.execute (cmnd, this, false, true);
     }
 
 
@@ -1788,8 +1773,7 @@ class Commands implements EventNotifier {
         for (String cmnd : monitorCommands) {
             int start = cmnd.indexOf (':');
             if (start >= 0)
-                CommandParser.execute (cmnd.substring (start + 1), this,
-                                       null, false);
+                CommandParser.execute (cmnd.substring (start + 1), this, false);
         }
     }
 
@@ -1820,67 +1804,60 @@ class Commands implements EventNotifier {
         Env.noticeln("Initializing...");
 
         try {
-            standardInputReader =
-                new BufferedReader(new InputStreamReader(System.in,
-                                                         "ISO-8859-1"));
+            Readline.load(ReadlineLibrary.GnuReadline);
+        } catch (java.lang.UnsatisfiedLinkError ule) {
+            System.out.println("error loading lib " + ule);
+        }
+
+        Readline.initReadline("gjdb");
+
+        try {
+            ireader = null;
+
             startHandler (true);
-            input = standardInputReader;
             String lastLine = null;
     
             /*
              * Try reading user's home startup file. Handle Unix and 
              * and Win32 conventions for the names of these files. 
              */
-            if (!readCommandFile(System.getProperty("user.home") + 
-                                 File.separator + "jdb.ini")) {
-                readCommandFile(System.getProperty("user.home") + 
-                                File.separator + ".jdbrc");
+            if (!readCommandFile(System.getProperty("user.home") + File.separator + "jdb.ini")) {
+                readCommandFile(System.getProperty("user.home") + File.separator + ".jdbrc");
             }
     
             // Try startup file in local directory
-            if (!readCommandFile(System.getProperty("user.dir") + 
-                                 File.separator + "jdb.ini")) {
-                readCommandFile(System.getProperty("user.dir") + 
-                                File.separator + ".jdbrc");
+            if (!readCommandFile(System.getProperty("user.dir") + File.separator + "jdb.ini")) {
+                readCommandFile(System.getProperty("user.dir") + File.separator + ".jdbrc");
             }
     
             // Process interactive commands.
-            printPrompt();
             while (true) {
-                String ln = input.readLine();
-                if (ln == null && Env.relayingInput ()) {
-                    Env.connection ().closeOutputToRemote ();
-                    input = standardInputReader;
-                    ln = input.readLine ();
-                }
-                if (ln == null) {
+                String ln = null;
+                try {
+                    ln = Readline.readline(Env.getPrompt());
+                    if (false && ln == null && Env.relayingInput ()) {
+                        Env.connection ().closeOutputToRemote ();
+                        ln = ireader.readLine ();
+                    }
+                    if (null == ln && null == lastLine)
+                        continue;
+                    if (null == ln && null != lastLine) {
+                        ln = lastLine;
+                        Env.noticeln("%s", ln);
+                    }
+                    ln = trim(ln);
+                } catch (java.io.EOFException eof) {
                     Env.noticeln("Input stream closed.");
                     return;
                 }
-    
-                if (! ln.startsWith (STOP_COMMAND)
-                    && Env.relayingInput ()) {
+
+                if (false && ! ln.startsWith (STOP_COMMAND) && Env.relayingInput ()) {
                     Env.connection ().sendToRemote (ln);
                     Env.connection ().sendToRemote ("\n");
-                } else {
-                    if (ln.startsWith("!!")) {
-                        if (lastLine == null) {
-                            Env.errorln ("No last line");
-                            printPrompt ();
-                            continue;
-                        }
-                        ln = lastLine + ln.substring(2);
-                        Env.noticeln("%s", ln);
-                    }
-                    ln = trim (ln);
-    
-                    if (ln.length () > 0) {
-                        lastLine = ln;
-                        CommandParser.execute(ln, this, input, true);
-                    } else {
-                        printPrompt();
-                    }
-                }
+                } else if (0 < ln.length ()) {
+                    lastLine = ln;
+                    CommandParser.execute(ln, this, true);
+                } 
             }
         } catch (IOException e) {
             Env.errorln ("Unexpected I/O error.");
@@ -1902,8 +1879,7 @@ class Commands implements EventNotifier {
         try {
             File fle = new File (filename);
             BufferedReader reader = new BufferedReader (new FileReader (fle));
-            Env.noticeln("*** Reading commands from %s",
-                         fle.getCanonicalPath ());
+            Env.noticeln("*** Reading commands from %s", fle.getCanonicalPath ());
             readCommandStream (reader);
             return true;
         } catch (IOException e) {
@@ -1916,16 +1892,17 @@ class Commands implements EventNotifier {
      */
     void readCommandStream (BufferedReader reader) {
         try {
+            ireader = reader;
             while (true) {
                 String ln = reader.readLine();
                 if (ln == null) 
                     break;
-                CommandParser.execute(ln, this, reader, false);
+                CommandParser.execute(ln, this, false);
             }
         } catch (IOException e) {
-            throw ERROR ("Input error while reading commands: %s", 
-                         e.getMessage ());
+            throw ERROR ("Input error while reading commands: %s", e.getMessage ());
         } finally {
+            ireader = null;
             try {
                 reader.close ();
             } catch (IOException e) {
@@ -2066,8 +2043,7 @@ class Commands implements EventNotifier {
         return false;
     }
 
-    public void vmInterrupted (EventSet events, 
-                               Collection<EventRequestSpec> specs) {
+    public void vmInterrupted (EventSet events, Collection<EventRequestSpec> specs) {
         Thread.yield();  // fetch output
         if (Env.isConnected () && ThreadInfo.current != null) {
             printCurrentLocation(needsLoc (events));
@@ -2080,8 +2056,7 @@ class Commands implements EventNotifier {
                     readCommandStream (spec.getCommands ());
         }
 
-        if (!Env.isConnected () || ThreadInfo.current == null
-            || needsLoc (events))
+        if (false && (!Env.isConnected () || ThreadInfo.current == null || needsLoc (events)))
             printPrompt();
     }
 
@@ -2095,7 +2070,6 @@ class Commands implements EventNotifier {
     private int stepTargetFrameCount;
 
     EventHandler handler = null;
-    BufferedReader input;
-    BufferedReader standardInputReader;
+    BufferedReader ireader = null;
     BreakpointSpec lastBreakpointSet;
 }

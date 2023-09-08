@@ -65,14 +65,13 @@ class Env {
     static void init() {
         String spec;
         spec = connectSpec;
-        if (!(javaArgs+classPath).equals ("")
-            && connectSpec.startsWith ("com.sun.jdi.CommandLineLaunch:")) 
-            {
-                spec += "options=" + javaArgs;
-                if (!javaArgs.equals ("") && !classPath.equals (""))
-                    spec += " ";
-                spec += classPath + ",";
-            }
+        if (!(javaArgs+classPath).equals ("") && connectSpec.startsWith ("com.sun.jdi.CommandLineLaunch:")) 
+        {
+            spec += "options=" + javaArgs;
+            if (!javaArgs.equals ("") && !classPath.equals (""))
+                spec += " ";
+            spec += classPath + ",";
+        }
         connection = new VMConnection(spec, cmdClass, commandLine, traceFlags);
         specList.unresolveAll ();
         specList.removeTransients ();
@@ -81,8 +80,7 @@ class Env {
 
     static boolean relayingInput () {
         return 
-            connection != null && ! connection.hasRedirectedInput ()
-            && relayInput && ! noStdin;
+            connection != null && ! connection.hasRedirectedInput () && relayInput && ! noStdin;
     }
 
     static void requestInputRelay (boolean which) {
@@ -183,18 +181,24 @@ class Env {
         System.out.flush ();
     }
 
-    static void printPrompt() {
+    static String getPrompt() {
+        // if (Env.relayingInput()) return "";
         ThreadInfo tinfo = ThreadInfo.current;
+        StringBuffer sb = new StringBuffer("");
         if (promptPrefix != null)
-            out.print (promptPrefix);
+            sb.append (promptPrefix);
         if (!isConnected ())
-            out.print("[-] ");
+            sb.append("[-] ");
         else if (tinfo == null)
-            out.print("[?] ");
+            sb.append("[?] ");
         else {
-            out.print(tinfo.thread.name() 
-                      + "[" + tinfo.currentFrameIndex + "] ");
+            sb.append(tinfo.thread.name()).append("[").append(tinfo.currentFrameIndex).append("] ");
         }
+        return sb.toString();
+    }
+
+    static void printPrompt() {
+        out.print(getPrompt());
         out.flush();
     }
 

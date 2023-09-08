@@ -108,7 +108,7 @@ fi
 
 if [ -r "${apphome}/lib/tools.jar" ]; then
    jdilib="${apphome}/lib/tools.jar"
-   complib="-classpath $jdilib"
+   complib="-classpath $jdilib:$srcdir/lib/libreadline-java.jar"
 else
    jdilib=
    complib=

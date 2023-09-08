@@ -1,6 +1,14 @@
 		GJDB Version 6
 
 
+NOTES
+-----
+
+Forked from https://github.com/PNHilfinger/GJDB
+- builds with bison 3.8.2 and jflex 1.8.2 [ submitted as a patch in 2015 ]
+- adds java-readline [ https://github.com/aclemons/java-readline ] for command history and editing
+- <enter> repeats last command
+
 DESCRIPTION
 -----------
 
